@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mini GTA - Perfect Vehicle Seating & Controls</title>
+    <title>Mini GTA - Perfect Controls</title>
     
-    <!-- Manifest file link for Auto Landscape -->
     <link rel="manifest" href="manifest.json">
 
     <style>
@@ -46,7 +45,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-        // --- সাউন্ড সিস্টেম ---
+        // --- সাউন্ড সিস্টেম (আগের মতোই) ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         document.body.addEventListener('touchstart', () => { if(audioCtx.state === 'suspended') audioCtx.resume(); }, {once:true});
 
@@ -96,18 +95,12 @@
         document.getElementById('btn-fullscreen').addEventListener('click', async () => {
             let elem = document.documentElement;
             try {
-                if (elem.requestFullscreen) {
-                    await elem.requestFullscreen();
-                }
-                // ফুলস্ক্রিন হওয়ার পর অটোমেটিক ল্যান্ডস্কেপ মোডে লক করবে
-                if (screen.orientation && screen.orientation.lock) {
-                    await screen.orientation.lock('landscape');
-                }
-            } catch (err) {
-                console.log("Landscape lock error:", err);
-            }
+                if (elem.requestFullscreen) await elem.requestFullscreen();
+                if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape');
+            } catch (err) { console.log("Landscape lock error:", err); }
         });
 
+        // --- ক্যামেরা ও சீন সেটাপ (ফিক্সড জুম ইস্যু) ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x87CEEB);
         scene.fog = new THREE.FogExp2(0x87CEEB, 0.001);
@@ -118,9 +111,20 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
+        function adjustCameraFOV() {
+            // রোটেট করলে জুম আউট হয়ে ছোট হওয়া বন্ধ করার লজিক
+            if (window.innerWidth > window.innerHeight) {
+                camera.fov = 45; // ল্যান্ডস্কেপে জুম একটু বাড়িয়ে পারফেক্ট করবে
+            } else {
+                camera.fov = 60; // পোট্রেটে নরমাল
+            }
+            camera.updateProjectionMatrix();
+        }
+        adjustCameraFOV(); // শুরুতে একবার কল করা হলো
+
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            adjustCameraFOV();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
@@ -268,8 +272,7 @@
             let isCar = Math.random() > 0.4;
             let veh = isCar ? createDetailedCar(Math.random() * 0xffffff) : createDetailedBike(Math.random() * 0xffffff);
             let driver = buildHuman(Math.random() * 0xffffff);
-            veh.add(driver.mesh);
-            driver.mesh.rotation.set(0,0,0);
+            veh.add(driver.mesh); driver.mesh.rotation.set(0,0,0);
             
             if (isCar) { driver.mesh.position.set(-0.6, 0.1, -0.2); driver.mesh.scale.set(0.65, 0.65, 0.65); driver.setPosture('SIT_CAR'); }
             else { driver.mesh.position.set(0, 1.0, -0.2); driver.mesh.scale.set(0.75, 0.75, 0.75); driver.setPosture('SIT_BIKE'); }
@@ -312,12 +315,14 @@
             if (playerGun) btnAttack.innerHTML = "গুলি 🔫"; else btnAttack.innerHTML = "ঘুষি 👊";
         }
 
-        // --- প্লেয়ার কন্ট্রোল ও লজিক ---
+        // --- প্লেয়ার কন্ট্রোল ও স্ক্রিন ঘোরানো লজিক ---
         let currentVehicle = null, isDriving = false;
         let walkCycle = 0, moveX = 0, moveY = 0, playerSpeed = 0.5, driveSpeed = 0, targetRotation = 0;
-        let pAngle = 0;
+        let pAngle = 0, cameraAngle = 0; 
+        
         const keys = {}; window.addEventListener('keydown', e => keys[e.code] = true); window.addEventListener('keyup', e => keys[e.code] = false);
 
+        // জয়স্টিক কন্ট্রোল
         const jBase = document.getElementById('joystick-base'); const jKnob = document.getElementById('joystick-knob');
         let jActive = false, jTouchId = null, jCenter = { x: 0, y: 0 };
         
@@ -325,19 +330,49 @@
             e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier;
             const rect = jBase.getBoundingClientRect(); jCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
             updateJoystick(e.changedTouches[0]);
-        });
+        }, { passive: false });
         
-        document.addEventListener('touchmove', e => {
-            if (!jActive) return;
+        // স্ক্রিন সোয়াইপ করে ক্যামেরা ঘোরানোর কন্ট্রোল
+        let isSwiping = false, swipeTouchId = null, lastTouchX = 0;
+
+        document.addEventListener('touchstart', e => {
             for (let i = 0; i < e.changedTouches.length; i++) {
-                if (e.changedTouches[i].identifier === jTouchId) updateJoystick(e.changedTouches[i]);
+                let touch = e.changedTouches[i];
+                // বাটন বা জয়স্টিকে টাচ করলে ক্যামেরা ঘুরবে না
+                if (touch.target.closest('#hud') || touch.target.closest('#joystick-base') || touch.target.closest('.btn-action') || touch.target.closest('button')) continue;
+                
+                if (!isSwiping) {
+                    isSwiping = true;
+                    swipeTouchId = touch.identifier;
+                    lastTouchX = touch.clientX;
+                }
             }
-        });
+        }, { passive: false });
+
+        document.addEventListener('touchmove', e => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                let touch = e.changedTouches[i];
+                // জয়স্টিক মুভমেন্ট
+                if (jActive && touch.identifier === jTouchId) {
+                    updateJoystick(touch);
+                }
+                // স্ক্রিন সোয়াইপ করে ক্যামেরা ঘোরানো
+                if (isSwiping && touch.identifier === swipeTouchId) {
+                    let deltaX = touch.clientX - lastTouchX;
+                    cameraAngle -= deltaX * 0.008; // ক্যামেরা ঘোরার স্পিড
+                    lastTouchX = touch.clientX;
+                }
+            }
+        }, { passive: false });
         
         document.addEventListener('touchend', e => {
             for (let i = 0; i < e.changedTouches.length; i++) {
-                if (e.changedTouches[i].identifier === jTouchId) {
+                let touch = e.changedTouches[i];
+                if (jActive && touch.identifier === jTouchId) {
                     jActive = false; jTouchId = null; jKnob.style.transform = `translate(0px, 0px)`; moveX = 0; moveY = 0; updateEngineSound(false, 0);
+                }
+                if (isSwiping && touch.identifier === swipeTouchId) {
+                    isSwiping = false; swipeTouchId = null;
                 }
             }
         });
@@ -366,20 +401,16 @@
         }
 
         btnVehicle.addEventListener('touchstart', e => {
-            e.preventDefault();
-            playSound('enter');
+            e.preventDefault(); playSound('enter');
             if (isDriving) {
                 isDriving = false;
                 const exitOffset = new THREE.Vector3(-4, 0, 0); exitOffset.applyEuler(currentVehicle.rotation);
                 player.mesh.position.copy(currentVehicle.position).add(exitOffset);
                 player.mesh.rotation.y = currentVehicle.rotation.y;
-                player.setPosture('STAND');
-                player.mesh.scale.set(1, 1, 1);
-                scene.add(player.mesh);
-                updateEngineSound(false, 0);
+                player.setPosture('STAND'); player.mesh.scale.set(1, 1, 1);
+                scene.add(player.mesh); updateEngineSound(false, 0);
             } else if (currentVehicle) {
                 isDriving = true; player.mesh.position.set(0, 0, 0); player.mesh.rotation.set(0, 0, 0); currentVehicle.add(player.mesh);
-                
                 if (currentVehicle === car) { player.mesh.position.set(-0.6, 0.1, -0.2); player.mesh.scale.set(0.65, 0.65, 0.65); player.setPosture('SIT_CAR'); }
                 else if (currentVehicle === bike) { player.mesh.position.set(0, 1.0, -0.2); player.mesh.scale.set(0.75, 0.75, 0.75); player.setPosture('SIT_BIKE'); }
             }
@@ -399,7 +430,6 @@
                 playSound('punch');
                 player.armR.rotation.x = -Math.PI / 2;
                 setTimeout(() => { if (!isDriving) player.armR.rotation.x = 0; }, 150);
-                
                 npcs.forEach(n => {
                     if (n.obj.mesh.position.distanceTo(player.mesh.position) < 3) {
                         n.obj.hp -= 20; n.obj.mesh.position.x += 1;
@@ -421,8 +451,11 @@
             if (keys['ArrowDown'] || keys['KeyS']) { moveY = 1; moving = true; }
             if (keys['ArrowLeft'] || keys['KeyA']) { moveX = -1; moving = true; }
             if (keys['ArrowRight'] || keys['KeyD']) { moveX = 1; moving = true; }
+            
             if (jActive || moving) {
-                pAngle = Math.atan2(moveX, moveY);
+                // ক্যামেরার এঙ্গেলের সাথে প্লেয়ারের হাঁটার দিক ঠিক করা হলো
+                pAngle = Math.atan2(moveX, moveY) + cameraAngle; 
+                
                 if (!isDriving) {
                     player.mesh.rotation.y = pAngle;
                     player.mesh.position.x += Math.sin(pAngle) * playerSpeed;
@@ -500,7 +533,6 @@
                         let angle = Math.atan2(player.mesh.position.x - n.obj.mesh.position.x, player.mesh.position.z - n.obj.mesh.position.z);
                         n.obj.mesh.rotation.y = angle;
                         if (distToPlayer > 15) { n.obj.mesh.position.x += Math.sin(angle) * 0.2; n.obj.mesh.position.z += Math.cos(angle) * 0.2; }
-                        
                         n.cooldown++;
                         if (n.cooldown > 60) {
                             n.cooldown = 0; playSound('shoot');
@@ -512,7 +544,6 @@
                         }
                     } else { n.state = 'WANDER'; }
                 }
-                
                 if (n.state === 'WANDER') {
                     if (n.obj.mesh.position.distanceTo(n.targetPos) < 2) { n.targetPos = new THREE.Vector3((Math.random()-0.5)*900, 0, (Math.random()-0.5)*900); }
                     let angle = Math.atan2(n.targetPos.x - n.obj.mesh.position.x, n.targetPos.z - n.obj.mesh.position.z);
@@ -527,8 +558,14 @@
                 updateHUD();
             }
 
+            // ক্যামেরা পজিশন ও ঘোরানোর লজিক
             let camTarget = isDriving ? currentVehicle.position : player.mesh.position;
-            camera.position.lerp(new THREE.Vector3(camTarget.x, camTarget.y + 25, camTarget.z + 30), 0.1);
+            
+            // ক্যামেরার দূরত্ব একটু কাছে এনে দিয়েছি যাতে ছোট না লাগে (0, 15, 20)
+            let camOffset = new THREE.Vector3(0, 15, 20);
+            camOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraAngle);
+            
+            camera.position.lerp(new THREE.Vector3(camTarget.x + camOffset.x, camTarget.y + camOffset.y, camTarget.z + camOffset.z), 0.1);
             camera.lookAt(camTarget);
 
             renderer.render(scene, camera);
