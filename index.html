@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Mini GTA - Perfect Vehicle Seating & Controls</title>
+    
+    <!-- Manifest file link for Auto Landscape -->
+    <link rel="manifest" href="manifest.json">
+
     <style>
         * { box-sizing: border-box; }
         body, html { margin: 0; padding: 0; overflow: hidden; background: #87CEEB; font-family: sans-serif; touch-action: none; user-select: none; }
@@ -12,7 +16,7 @@
         #hud { position: absolute; top: 12px; left: 12px; background: rgba(0,0,0,0.8); color: white; padding: 12px 16px; border-radius: 10px; border-left: 5px solid #2ecc71; font-size: 14px; z-index: 10; pointer-events: none; min-width: 170px; }
         .hp-bar-bg { width: 100%; height: 10px; background: #444; border-radius: 5px; margin-top: 5px; overflow: hidden; }
         .hp-bar-fill { width: 100%; height: 100%; background: #e74c3c; transition: width 0.2s; }
-        #btn-fullscreen { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #fff; padding: 8px 12px; border-radius: 6px; z-index: 10; font-size: 12px; }
+        #btn-fullscreen { position: absolute; top: 12px; right: 12px; background: rgba(0,0,0,0.6); color: #fff; border: 1px solid #fff; padding: 8px 12px; border-radius: 6px; z-index: 10; font-size: 12px; cursor: pointer; }
 
         #joystick-base { position: absolute; bottom: 35px; left: 35px; width: 130px; height: 130px; background: rgba(255,255,255,0.25); border: 2px solid rgba(255,255,255,0.8); border-radius: 50%; z-index: 10; }
         #joystick-knob { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: #ff3b30; border: 2px solid #fff; border-radius: 50%; pointer-events: none; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
@@ -88,9 +92,20 @@
             }
         }
 
-        // --- বেসিক সেটআপ ---
-        document.getElementById('btn-fullscreen').addEventListener('click', () => {
-            if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        // --- ফুলস্ক্রিন ও অটো ল্যান্ডস্কেপ সিস্টেম ---
+        document.getElementById('btn-fullscreen').addEventListener('click', async () => {
+            let elem = document.documentElement;
+            try {
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                }
+                // ফুলস্ক্রিন হওয়ার পর অটোমেটিক ল্যান্ডস্কেপ মোডে লক করবে
+                if (screen.orientation && screen.orientation.lock) {
+                    await screen.orientation.lock('landscape');
+                }
+            } catch (err) {
+                console.log("Landscape lock error:", err);
+            }
         });
 
         const scene = new THREE.Scene();
@@ -102,6 +117,12 @@
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.7); scene.add(ambientLight);
         const sun = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -178,7 +199,6 @@
 
             function setPosture(mode) {
                 if (mode === 'SIT_BIKE') {
-                    // ফিক্সড: মাইনাস (-) রোটেশন মানে হাত-পা সামনের দিকে স্টিয়ারিংয়ের দিকে যাবে
                     legLGroup.rotation.set(-1.2, 0, 0.3); legRGroup.rotation.set(-1.2, 0, -0.3);
                     armLGroup.rotation.set(-1.2, 0.2, 0); armRGroup.rotation.set(-1.2, -0.2, 0);
                     torso.rotation.x = -0.15; 
@@ -218,7 +238,6 @@
             const wFL = createWheel(); wFL.position.set(-2.1, 0.8, -2.2); const wFR = createWheel(); wFR.position.set(2.1, 0.8, -2.2);
             const wRL = createWheel(); wRL.position.set(-2.1, 0.8, 2.2); const wRR = createWheel(); wRR.position.set(2.1, 0.8, 2.2);
             
-            // গাড়ির হেডলাইট এবং টেললাইট যোগ করা হলো ফ্রন্ট সাইড চেনার জন্য
             const hlL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.2), new THREE.MeshBasicMaterial({ color: 0xffffcc })); hlL.position.set(-1.2, 1.2, -3.8);
             const hlR = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.2), new THREE.MeshBasicMaterial({ color: 0xffffcc })); hlR.position.set(1.2, 1.2, -3.8);
             const tlL = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 })); tlL.position.set(-1.2, 1.2, 3.8);
@@ -234,7 +253,6 @@
             const tank = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.7, 1.4), new THREE.MeshStandardMaterial({ color: color })); tank.position.set(0, 1.7, -0.4);
             const handle = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.15, 0.15), new THREE.MeshStandardMaterial({ color: 0xdddddd })); handle.position.set(0, 2.2, -1.1);
             
-            // বাইকের হেডলাইট এবং টেললাইট যোগ করা হলো
             const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.4, 0.2), new THREE.MeshBasicMaterial({ color: 0xffffcc })); headlight.position.set(0, 1.8, -1.9);
             const taillight = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.3, 0.1), new THREE.MeshBasicMaterial({ color: 0xff0000 })); taillight.position.set(0, 1.3, 1.8);
             
@@ -251,7 +269,7 @@
             let veh = isCar ? createDetailedCar(Math.random() * 0xffffff) : createDetailedBike(Math.random() * 0xffffff);
             let driver = buildHuman(Math.random() * 0xffffff);
             veh.add(driver.mesh);
-            driver.mesh.rotation.set(0,0,0); // পারফেক্ট ফরোয়ার্ড রোটেশন
+            driver.mesh.rotation.set(0,0,0);
             
             if (isCar) { driver.mesh.position.set(-0.6, 0.1, -0.2); driver.mesh.scale.set(0.65, 0.65, 0.65); driver.setPosture('SIT_CAR'); }
             else { driver.mesh.position.set(0, 1.0, -0.2); driver.mesh.scale.set(0.75, 0.75, 0.75); driver.setPosture('SIT_BIKE'); }
@@ -278,146 +296,241 @@
             coin.rotation.x = Math.PI / 2; coin.position.set((Math.random()-0.5)*1200, 1.2, (Math.random()-0.5)*1200);
             scene.add(coin); coinsOnGround.push(coin);
         }
-        for (let i = 0; i < 15; i++) {
-            let g = createGunMesh(); g.scale.set(1.5,1.5,1.5); g.position.set((Math.random()-0.5)*1200, 0.6, (Math.random()-0.5)*1200);
-            scene.add(g); gunsOnGround.push(g);
+
+        let playerGun = false, playerCoins = 0;
+        const btnAttack = document.getElementById('btn-attack');
+        const btnVehicle = document.getElementById('btn-vehicle');
+        const gunTxt = document.getElementById('gun-txt');
+        const coinTxt = document.getElementById('coin-txt');
+        const hpFill = document.getElementById('hp-fill');
+
+        function updateHUD() {
+            coinTxt.innerHTML = `🪙 কয়েন: ${playerCoins}`;
+            gunTxt.innerHTML = playerGun ? `🔫 গান: আছে` : `🔫 গান: নেই`;
+            hpFill.style.width = Math.max(0, player.hp) + '%';
+            if (player.hp < 30) hpFill.style.background = '#8b0000'; else hpFill.style.background = '#e74c3c';
+            if (playerGun) btnAttack.innerHTML = "গুলি 🔫"; else btnAttack.innerHTML = "ঘুষি 👊";
         }
 
-        function fireBullet(fromPos, dir, isPlayerBullet) {
-            const b = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff000 }));
-            b.position.copy(fromPos); b.position.y += 2.5; scene.add(b);
-            bullets.push({ mesh: b, dir: dir.clone().normalize(), life: 60, isPlayerBullet });
-            if(isPlayerBullet) playSound('shoot');
-        }
+        // --- প্লেয়ার কন্ট্রোল ও লজিক ---
+        let currentVehicle = null, isDriving = false;
+        let walkCycle = 0, moveX = 0, moveY = 0, playerSpeed = 0.5, driveSpeed = 0, targetRotation = 0;
+        let pAngle = 0;
+        const keys = {}; window.addEventListener('keydown', e => keys[e.code] = true); window.addEventListener('keyup', e => keys[e.code] = false);
 
-        // --- কন্ট্রোলস ---
-        let playerCoins = 0, playerHasGun = false, playerHP = 100, stepTimer = 0;
-        const btnAttack = document.getElementById('btn-attack'), btnVehicle = document.getElementById('btn-vehicle');
-        const coinTxt = document.getElementById('coin-txt'), gunTxt = document.getElementById('gun-txt'), hpFill = document.getElementById('hp-fill');
-
-        btnAttack.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            if (playerHasGun) {
-                let dir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.mesh.rotation.y);
-                fireBullet(player.mesh.position, dir, true);
-            } else {
-                playSound('punch');
-                player.armR.rotation.x = -1.5; setTimeout(() => player.armR.rotation.x = 0, 200);
-                npcs.forEach(n => { if (player.mesh.position.distanceTo(n.obj.mesh.position) < 4) { n.state = 'ATTACK'; n.obj.hp -= 40; } });
+        const jBase = document.getElementById('joystick-base'); const jKnob = document.getElementById('joystick-knob');
+        let jActive = false, jTouchId = null, jCenter = { x: 0, y: 0 };
+        
+        jBase.addEventListener('touchstart', e => {
+            e.preventDefault(); jActive = true; jTouchId = e.changedTouches[0].identifier;
+            const rect = jBase.getBoundingClientRect(); jCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+            updateJoystick(e.changedTouches[0]);
+        });
+        
+        document.addEventListener('touchmove', e => {
+            if (!jActive) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === jTouchId) updateJoystick(e.changedTouches[i]);
+            }
+        });
+        
+        document.addEventListener('touchend', e => {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === jTouchId) {
+                    jActive = false; jTouchId = null; jKnob.style.transform = `translate(0px, 0px)`; moveX = 0; moveY = 0; updateEngineSound(false, 0);
+                }
             }
         });
 
-        let joyX = 0, joyY = 0, joyTouchId = null, camAngleX = 0, camAngleY = 0.35;
-        const joyBase = document.getElementById('joystick-base'), joyKnob = document.getElementById('joystick-knob');
-        let baseRect = joyBase.getBoundingClientRect(); window.addEventListener('resize', () => baseRect = joyBase.getBoundingClientRect());
-
-        joyBase.addEventListener('touchstart', e => { e.preventDefault(); joyTouchId = e.changedTouches[0].identifier; updateJoy(e.changedTouches[0]); }, { passive: false });
-        window.addEventListener('touchmove', e => { for (let t of e.changedTouches) if (t.identifier === joyTouchId) updateJoy(t); }, { passive: false });
-        window.addEventListener('touchend', e => { for (let t of e.changedTouches) if (t.identifier === joyTouchId) { joyTouchId = null; joyX = 0; joyY = 0; joyKnob.style.transform = `translate(0px, 0px)`; } });
-
-        function updateJoy(touch) {
-            let cx = baseRect.left + baseRect.width / 2, cy = baseRect.top + baseRect.height / 2;
-            let dx = touch.clientX - cx, dy = touch.clientY - cy, dist = Math.hypot(dx, dy), maxR = 40;
-            if (dist > maxR) { dx = (dx / dist) * maxR; dy = (dy / dist) * maxR; }
-            joyKnob.style.transform = `translate(${dx}px, ${dy}px)`; joyX = dx / maxR; joyY = dy / maxR;
+        function updateJoystick(touch) {
+            let dx = touch.clientX - jCenter.x, dy = touch.clientY - jCenter.y;
+            let dist = Math.sqrt(dx * dx + dy * dy); let maxD = 65;
+            if (dist > maxD) { dx = (dx / dist) * maxD; dy = (dy / dist) * maxD; }
+            jKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+            moveX = dx / maxD; moveY = dy / maxD;
+            if (isDriving) updateEngineSound(true, moveY);
         }
 
-        let camTouchId = null, lastX = 0, lastY = 0;
-        window.addEventListener('touchstart', e => { for (let t of e.changedTouches) if (t.clientX > window.innerWidth / 2 && camTouchId === null) { camTouchId = t.identifier; lastX = t.clientX; lastY = t.clientY; } }, { passive: false });
-        window.addEventListener('touchmove', e => { for (let t of e.changedTouches) if (t.identifier === camTouchId) { camAngleX -= (t.clientX - lastX) * 0.007; camAngleY += (t.clientY - lastY) * 0.007; camAngleY = Math.max(0.1, Math.min(1.2, camAngleY)); lastX = t.clientX; lastY = t.clientY; } }, { passive: false });
-        window.addEventListener('touchend', e => { for (let t of e.changedTouches) if (t.identifier === camTouchId) camTouchId = null; });
+        function createGunPickup(x, z) {
+            const mg = createGunMesh(); mg.scale.set(3, 3, 3); mg.position.set(x, 1, z);
+            scene.add(mg); gunsOnGround.push(mg);
+        }
+        createGunPickup(50, 50);
 
-        let currentVehicle = 0, nearVeh = null, vehSpeed = 0;
+        function checkVehicleProximity() {
+            if (isDriving) { btnVehicle.style.display = 'block'; btnVehicle.innerHTML = "গাড়ি থেকে নামুন 🏃‍♂️"; return; }
+            let nearest = null, dist = Infinity;
+            [car, bike].forEach(v => { let d = player.mesh.position.distanceTo(v.position); if (d < dist) { dist = d; nearest = v; } });
+            if (dist < 5) { currentVehicle = nearest; btnVehicle.style.display = 'block'; btnVehicle.innerHTML = (currentVehicle === car ? "গাড়িতে" : "বাইকে") + " উঠুন"; }
+            else { currentVehicle = null; btnVehicle.style.display = 'none'; }
+        }
 
-        btnVehicle.addEventListener('touchstart', (e) => {
+        btnVehicle.addEventListener('touchstart', e => {
             e.preventDefault();
             playSound('enter');
-            if (currentVehicle === 0 && nearVeh !== null) {
-                currentVehicle = nearVeh; let vObj = currentVehicle === 1 ? car : bike;
-                vObj.add(player.mesh); player.mesh.rotation.set(0, 0, 0); 
-                if (currentVehicle === 2) { 
-                    player.mesh.position.set(0, 1.0, -0.2); // সিটিং পজিশন স্টিয়ারিংয়ের কাছে নেওয়া হয়েছে
-                    player.mesh.scale.set(0.75, 0.75, 0.75); 
-                    player.setPosture('SIT_BIKE'); 
-                } 
-                else { 
-                    player.mesh.position.set(-0.6, 0.1, -0.2); 
-                    player.mesh.scale.set(0.65, 0.65, 0.65); 
-                    player.setPosture('SIT_CAR'); 
-                }
-                btnVehicle.innerText = "নামুন 🚶";
-            } else if (currentVehicle !== 0) {
-                let vObj = currentVehicle === 1 ? car : bike; scene.add(player.mesh);
-                player.mesh.position.set(vObj.position.x - 4, 0, vObj.position.z);
-                player.mesh.rotation.set(0, vObj.rotation.y, 0); player.mesh.scale.set(1, 1, 1);
-                player.setPosture('STAND'); currentVehicle = 0; btnVehicle.style.display = 'none'; updateEngineSound(false, 0);
+            if (isDriving) {
+                isDriving = false;
+                const exitOffset = new THREE.Vector3(-4, 0, 0); exitOffset.applyEuler(currentVehicle.rotation);
+                player.mesh.position.copy(currentVehicle.position).add(exitOffset);
+                player.mesh.rotation.y = currentVehicle.rotation.y;
+                player.setPosture('STAND');
+                player.mesh.scale.set(1, 1, 1);
+                scene.add(player.mesh);
+                updateEngineSound(false, 0);
+            } else if (currentVehicle) {
+                isDriving = true; player.mesh.position.set(0, 0, 0); player.mesh.rotation.set(0, 0, 0); currentVehicle.add(player.mesh);
+                
+                if (currentVehicle === car) { player.mesh.position.set(-0.6, 0.1, -0.2); player.mesh.scale.set(0.65, 0.65, 0.65); player.setPosture('SIT_CAR'); }
+                else if (currentVehicle === bike) { player.mesh.position.set(0, 1.0, -0.2); player.mesh.scale.set(0.75, 0.75, 0.75); player.setPosture('SIT_BIKE'); }
+            }
+            updateHUD();
+        });
+
+        btnAttack.addEventListener('touchstart', e => {
+            e.preventDefault();
+            if (isDriving) return;
+            if (playerGun) {
+                playSound('shoot');
+                const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({ color: 0xffff00 }));
+                bullet.position.copy(player.mesh.position); bullet.position.y += 2.5;
+                const pDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), player.mesh.rotation.y);
+                bullet.velocity = pDir.multiplyScalar(4); scene.add(bullet); bullets.push(bullet);
+            } else {
+                playSound('punch');
+                player.armR.rotation.x = -Math.PI / 2;
+                setTimeout(() => { if (!isDriving) player.armR.rotation.x = 0; }, 150);
+                
+                npcs.forEach(n => {
+                    if (n.obj.mesh.position.distanceTo(player.mesh.position) < 3) {
+                        n.obj.hp -= 20; n.obj.mesh.position.x += 1;
+                        if (n.obj.hp <= 0 && n.obj.mesh.parent === scene) {
+                            scene.remove(n.obj.mesh); let idx = npcs.indexOf(n); if (idx > -1) npcs.splice(idx, 1);
+                            playerCoins += 10; updateHUD();
+                        }
+                    }
+                });
             }
         });
 
-        // --- গেম লুপ ---
+        // --- মেইন লুপ ---
         function animate() {
             requestAnimationFrame(animate);
-            let time = Date.now() * 0.003;
+
+            let moving = false;
+            if (keys['ArrowUp'] || keys['KeyW']) { moveY = -1; moving = true; }
+            if (keys['ArrowDown'] || keys['KeyS']) { moveY = 1; moving = true; }
+            if (keys['ArrowLeft'] || keys['KeyA']) { moveX = -1; moving = true; }
+            if (keys['ArrowRight'] || keys['KeyD']) { moveX = 1; moving = true; }
+            if (jActive || moving) {
+                pAngle = Math.atan2(moveX, moveY);
+                if (!isDriving) {
+                    player.mesh.rotation.y = pAngle;
+                    player.mesh.position.x += Math.sin(pAngle) * playerSpeed;
+                    player.mesh.position.z += Math.cos(pAngle) * playerSpeed;
+                    
+                    walkCycle += 0.15;
+                    player.legL.rotation.x = Math.sin(walkCycle) * 0.6; player.legR.rotation.x = -Math.sin(walkCycle) * 0.6;
+                    player.armL.rotation.x = -Math.sin(walkCycle) * 0.5; player.armR.rotation.x = Math.sin(walkCycle) * 0.5;
+                    if (Math.floor(walkCycle * 10) % 20 === 0) playSound('step');
+                } else {
+                    targetRotation -= moveX * 0.04; currentVehicle.rotation.y = targetRotation;
+                    driveSpeed -= moveY * 0.02; driveSpeed *= 0.96;
+                    currentVehicle.position.x += Math.sin(currentVehicle.rotation.y) * driveSpeed;
+                    currentVehicle.position.z += Math.cos(currentVehicle.rotation.y) * driveSpeed;
+                    
+                    if (currentVehicle === car) {
+                        car.children[2].rotation.x += driveSpeed * 0.1; car.children[3].rotation.x += driveSpeed * 0.1;
+                        car.children[4].rotation.x += driveSpeed * 0.1; car.children[5].rotation.x += driveSpeed * 0.1;
+                    } else if (currentVehicle === bike) {
+                        bike.children[0].rotation.x += driveSpeed * 0.1; bike.children[1].rotation.x += driveSpeed * 0.1;
+                        bike.children[4].rotation.y = moveX * -0.4; bike.children[0].rotation.y = moveX * -0.4;
+                    }
+                }
+            } else {
+                if (!isDriving) {
+                    player.legL.rotation.x = 0; player.legR.rotation.x = 0; player.armL.rotation.x = 0; player.armR.rotation.x = 0; walkCycle = 0;
+                } else {
+                    driveSpeed *= 0.90; currentVehicle.position.x += Math.sin(currentVehicle.rotation.y) * driveSpeed; currentVehicle.position.z += Math.cos(currentVehicle.rotation.y) * driveSpeed;
+                    if (currentVehicle === bike) { bike.children[4].rotation.y = 0; bike.children[0].rotation.y = 0; }
+                }
+            }
+
+            checkVehicleProximity();
+
+            for (let i = bullets.length - 1; i >= 0; i--) {
+                let b = bullets[i]; b.position.add(b.velocity);
+                if (b.position.distanceTo(player.mesh.position) > 200) { scene.remove(b); bullets.splice(i, 1); continue; }
+                for (let j = npcs.length - 1; j >= 0; j--) {
+                    let n = npcs[j];
+                    if (b.position.distanceTo(n.obj.mesh.position) < 2) {
+                        n.obj.hp -= 40; scene.remove(b); bullets.splice(i, 1);
+                        if (n.obj.hp <= 0 && n.obj.mesh.parent === scene) {
+                            scene.remove(n.obj.mesh); npcs.splice(j, 1); playerCoins += 10; updateHUD();
+                        }
+                        break;
+                    }
+                }
+            }
+
+            for (let i = coinsOnGround.length - 1; i >= 0; i--) {
+                let c = coinsOnGround[i]; c.rotation.z += 0.05;
+                if (player.mesh.position.distanceTo(c.position) < 2) {
+                    scene.remove(c); coinsOnGround.splice(i, 1); playerCoins += 1; updateHUD(); playSound('step');
+                }
+            }
+
+            for (let i = gunsOnGround.length - 1; i >= 0; i--) {
+                let g = gunsOnGround[i]; g.rotation.y += 0.03; g.position.y = 1 + Math.sin(Date.now() * 0.005) * 0.2;
+                if (player.mesh.position.distanceTo(g.position) < 3) {
+                    scene.remove(g); gunsOnGround.splice(i, 1); playerGun = true; player.gunMesh.visible = true; updateHUD(); playSound('enter');
+                }
+            }
 
             trafficVehicles.forEach(tv => {
-                tv.mesh.translateZ(-tv.speed); 
-                if (Math.abs(tv.mesh.position.z) > 1200) { tv.mesh.position.z = Math.sign(tv.mesh.position.z) * 1199; tv.mesh.rotation.y += Math.PI; }
+                tv.mesh.position.z -= Math.cos(tv.mesh.rotation.y) * tv.speed; tv.mesh.position.x -= Math.sin(tv.mesh.rotation.y) * tv.speed;
+                if (tv.mesh.position.z > 1500) tv.mesh.position.z = -1500; if (tv.mesh.position.z < -1500) tv.mesh.position.z = 1500;
+                if (tv.mesh.position.distanceTo(isDriving ? currentVehicle.position : player.mesh.position) < 4) { player.hp -= 0.5; updateHUD(); }
             });
 
-            if (currentVehicle === 0) {
-                let dC = player.mesh.position.distanceTo(car.position), dB = player.mesh.position.distanceTo(bike.position);
-                if (dC < 7) { nearVeh = 1; btnVehicle.innerText = "কার-এ উঠুন 🚗"; btnVehicle.style.display = 'block'; }
-                else if (dB < 6) { nearVeh = 2; btnVehicle.innerText = "বাইক-এ উঠুন 🏍️"; btnVehicle.style.display = 'block'; }
-                else { nearVeh = null; btnVehicle.style.display = 'none'; }
-
-                let fwd = -joyY, right = joyX, isMoving = Math.abs(fwd) > 0.1 || Math.abs(right) > 0.1;
-                if (isMoving) {
-                    let cosA = Math.cos(camAngleX), sinA = Math.sin(camAngleX);
-                    let moveX = right * cosA - fwd * sinA, moveZ = -right * sinA - fwd * cosA;
-                    player.mesh.position.x += moveX * 0.38; player.mesh.position.z += moveZ * 0.38;
-                    player.mesh.rotation.y = Math.atan2(-moveX, -moveZ);
-                    player.legL.rotation.x = Math.sin(time * 10) * 0.6; player.legR.rotation.x = Math.sin(time * 10 + Math.PI) * 0.6;
-                    
-                    stepTimer++; if(stepTimer > 15) { playSound('step'); stepTimer = 0; }
-                } else {
-                    player.legL.rotation.x = 0; player.legR.rotation.x = 0; stepTimer = 0;
+            npcs.forEach(n => {
+                let distToPlayer = n.obj.mesh.position.distanceTo(player.mesh.position);
+                if (n.isEnemy) {
+                    if (distToPlayer < 40) {
+                        n.state = 'ATTACK';
+                        let angle = Math.atan2(player.mesh.position.x - n.obj.mesh.position.x, player.mesh.position.z - n.obj.mesh.position.z);
+                        n.obj.mesh.rotation.y = angle;
+                        if (distToPlayer > 15) { n.obj.mesh.position.x += Math.sin(angle) * 0.2; n.obj.mesh.position.z += Math.cos(angle) * 0.2; }
+                        
+                        n.cooldown++;
+                        if (n.cooldown > 60) {
+                            n.cooldown = 0; playSound('shoot');
+                            let eb = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
+                            eb.position.copy(n.obj.mesh.position); eb.position.y += 2.5;
+                            const eDir = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                            eb.velocity = eDir.multiplyScalar(2); scene.add(eb); bullets.push(eb);
+                            if (distToPlayer < 20) { player.hp -= 5; updateHUD(); }
+                        }
+                    } else { n.state = 'WANDER'; }
                 }
-
-                let dist = 14;
-                camera.position.x = player.mesh.position.x + Math.sin(camAngleX) * dist * Math.cos(camAngleY);
-                camera.position.y = player.mesh.position.y + Math.sin(camAngleY) * dist + 3;
-                camera.position.z = player.mesh.position.z + Math.cos(camAngleX) * dist * Math.cos(camAngleY);
-                camera.lookAt(player.mesh.position.x, player.mesh.position.y + 3, player.mesh.position.z);
-            } else {
-                let activeVeh = currentVehicle === 1 ? car : bike;
-                let turnSpeed = currentVehicle === 2 ? 0.08 : 0.05, maxSpeed = currentVehicle === 2 ? 1.25 : 0.95;
-
-                let fwd = -joyY, right = joyX, isMoving = Math.abs(fwd) > 0.1 || Math.abs(right) > 0.1;
-                if (isMoving) {
-                    let cosA = Math.cos(camAngleX), sinA = Math.sin(camAngleX);
-                    let moveX = right * cosA - fwd * sinA, moveZ = -right * sinA - fwd * cosA;
-                    
-                    let targetAngle = Math.atan2(-moveX, -moveZ);
-                    let diff = targetAngle - activeVeh.rotation.y;
-                    while (diff < -Math.PI) diff += Math.PI * 2;
-                    while (diff > Math.PI) diff -= Math.PI * 2;
-                    
-                    activeVeh.rotation.y += Math.sign(diff) * Math.min(Math.abs(diff), turnSpeed);
-                    vehSpeed = maxSpeed * Math.hypot(joyX, joyY);
-                    activeVeh.translateZ(-vehSpeed);
-                    updateEngineSound(true, vehSpeed);
-                } else {
-                    vehSpeed *= 0.9;
-                    if(vehSpeed > 0.01) activeVeh.translateZ(-vehSpeed);
-                    updateEngineSound(false, 0);
+                
+                if (n.state === 'WANDER') {
+                    if (n.obj.mesh.position.distanceTo(n.targetPos) < 2) { n.targetPos = new THREE.Vector3((Math.random()-0.5)*900, 0, (Math.random()-0.5)*900); }
+                    let angle = Math.atan2(n.targetPos.x - n.obj.mesh.position.x, n.targetPos.z - n.obj.mesh.position.z);
+                    n.obj.mesh.rotation.y = angle; n.obj.mesh.position.x += Math.sin(angle) * 0.15; n.obj.mesh.position.z += Math.cos(angle) * 0.15;
                 }
+            });
 
-                let dist = 18;
-                camera.position.x = activeVeh.position.x + Math.sin(camAngleX) * dist * Math.cos(camAngleY);
-                camera.position.y = activeVeh.position.y + Math.sin(camAngleY) * dist + 4;
-                camera.position.z = activeVeh.position.z + Math.cos(camAngleX) * dist * Math.cos(camAngleY);
-                camera.lookAt(activeVeh.position.x, activeVeh.position.y + 1, activeVeh.position.z);
+            if (player.hp <= 0) {
+                alert("Game Over! Coins Collected: " + playerCoins);
+                player.hp = 100; playerCoins = 0; playerGun = false; player.gunMesh.visible = false;
+                player.mesh.position.set(0, 0, 40); if (isDriving) { isDriving = false; currentVehicle.remove(player.mesh); scene.add(player.mesh); }
+                updateHUD();
             }
+
+            let camTarget = isDriving ? currentVehicle.position : player.mesh.position;
+            camera.position.lerp(new THREE.Vector3(camTarget.x, camTarget.y + 25, camTarget.z + 30), 0.1);
+            camera.lookAt(camTarget);
+
             renderer.render(scene, camera);
         }
         animate();
